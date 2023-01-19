@@ -1,0 +1,75 @@
+#Load libraries
+library(DAAG)
+library(party)
+library(rpart)
+library(rpart.plot)
+library(mlbench)
+library(caret)
+library(pROC)
+library(tree)
+library(datasets)
+library(MASS)
+library(ggplot2)
+library(readxl)
+
+
+library(readxl)
+set.seed(7202022)
+Biomarker_0_3 <- read_excel("Biomarker 0-3.xlsx")
+View(Biomarker_0_3)
+
+
+#Splitting dataset into 4:1 ratio for training data set
+library(caTools)
+sample_data = sample.split (Biomarker_0_3$Aggresivity, SplitRatio=0.75)
+train_data <- subset(Biomarker_0_3, sample_data==TRUE)
+test_data <- subset(Biomarker_0_3, sample_data==FALSE)
+
+train_data$Aggresivity = factor(train_data$Aggresivity)
+test_data$Aggresivity = factor(test_data$Aggresivity)
+
+#Create basic decision tree
+library(rpart)
+library(rpart.plot)
+tree <- rpart(Aggresivity~ phosphoRbS249+Ncadherin+Ecadherin+Bcatenin+TumorSize, data=train_data)
+rpart.plot(tree)
+summary(tree)
+prp(tree)
+plotcp(tree)
+
+#cp optimo
+printcp(tree)
+cp.select <- function(big.tree) {
+  min.x <- which.min(big.tree$cptable[, 4]) #column 4 is xerror
+  for(i in 1:nrow(big.tree$cptable)) {
+    if(big.tree$cptable[i, 4] < big.tree$cptable[min.x, 4] + big.tree$cptable[min.x, 5]) return(big.tree$cptable[i, 1]) #column 5: xstd, column 1: cp
+  }
+}
+pruned.tree <- prune(tree, cp = cp.select(tree))
+cp.select(tree)
+
+#Create basic decision tree 1
+library(rpart)
+library(rpart.plot)
+train_data$Aggresivity <- factor(train_data$Aggresivity)
+test_data$Aggresivity <- factor(test_data$Aggresivity)
+tree1 <- rpart(Aggresivity~ phosphoRbS249+Ncadherin+Ecadherin+Bcatenin+TumorSize, cp=0.02173913, data=train_data)
+rpart.plot(tree1)
+summary(tree1)
+prp(tree1)
+
+#Prediction
+prediction <- predict(tree1, newdata=train_data)
+rpartPred<-predict(tree1,train_data)
+table(train_data$Aggresivity, prediction, dnn = c("True", "Pred"))
+
+library(pROC)
+##TRAINING
+train_prob = predict(tree1, train_data, type="prob")
+train_roc = multiclass.roc(train_data$Aggresivity, train_prob, type="prob")
+as.numeric(train_roc$auc)
+
+###test
+test_prob = predict(tree1, test_data, type="prob")
+test_roc = multiclass.roc(test_data$Aggresivity, test_prob, type="prob")
+as.numeric(test_roc$auc)
