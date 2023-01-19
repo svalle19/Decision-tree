@@ -15,15 +15,15 @@ library(readxl)
 
 library(readxl)
 set.seed(7202022)
-Biomarker_0_3 <- read_excel("Biomarker 0-3.xlsx")
-View(Biomarker_0_3)
+Biomarkers <- read_excel("Biomarkers.xlsx")
+View(Biomarkers)
 
 
 #Splitting dataset into 4:1 ratio for training data set
 library(caTools)
-sample_data = sample.split (Biomarker_0_3$Aggresivity, SplitRatio=0.60)
-train_data <- subset(Biomarker_0_3, sample_data==TRUE)
-test_data <- subset(Biomarker_0_3, sample_data==FALSE)
+sample_data = sample.split (Biomarkers$Aggresivity, SplitRatio=0.75)
+train_data <- subset(Biomarkers, sample_data==TRUE)
+test_data <- subset(Biomarkers, sample_data==FALSE)
 
 train_data$Aggresivity = factor(train_data$Aggresivity)
 test_data$Aggresivity = factor(test_data$Aggresivity)
@@ -53,7 +53,7 @@ library(rpart)
 library(rpart.plot)
 train_data$Aggresivity <- factor(train_data$Aggresivity)
 test_data$Aggresivity <- factor(test_data$Aggresivity)
-tree1 <- rpart(Aggresivity~ phosphoRbS249+Ncadherin+Ecadherin+Bcatenin, cp=0.01807229, data=train_data)
+tree1 <- rpart(Aggresivity~ phosphoRbS249+Ncadherin+Ecadherin+Bcatenin, cp=0.04117647, data=train_data)
 rpart.plot(tree1)
 summary(tree1)
 prp(tree1)
@@ -69,55 +69,7 @@ train_prob = predict(tree1, train_data, type="prob")
 train_roc = multiclass.roc(train_data$Aggresivity, train_prob, type="prob")
 as.numeric(train_roc$auc)
 
-###test
+###TEST
 test_prob = predict(tree1, test_data, type="prob")
 test_roc = multiclass.roc(test_data$Aggresivity, test_prob, type="prob")
 as.numeric(test_roc$auc)
-
-#Plot ROC
-install.packages('devtools')
-require(devtools)
-install_github("WandeRum/multiROC")
-require(multiROC)
-
-install.packages('multiROC')
-require(multiROC)
-
-require(multiROC)
-data(test_roc)
-head(test_roc)
-
-set.seed(123456)
-total_number <- nrow(test_roc)
-train_idx <- sample(total_number, round(total_number*0.60))
-train_df <- test_roc[train_data, ]
-test_df <- test_roc[-train_data, ]
-
-library(ROCR)
-pr <- predict(tree1, train_data, type="prob")
-perf <- performance(pr, measure="tpr", x.measure="fpr")
-plot(pr, colorize=TRUE, lwd=3, print.cutoffs.at=c(seq(0,1,by=0.1)))
-abline(a=1, b=2, lty=2)
-
-erf.f1 <- performance(pr,measure="f")
-perf.acc <- performance(pr,measure="acc")
-
-par(mfrow=c(1,2))
-plot(perf.f1)
-plot(perf.acc)
-
-library(ROCR)
-library(klaR)
-
-data(test_data)
-
-lvls = levels(test_data$Aggresivity)
-testidx = which(1:length(test_data[, 1]) %% 5 == 0) 
-test_data.train = test_data[testidx, ]
-test_data.test = test_data[-testidx, ]
-
-aucs = c()
-plot(x=NA, y=NA, xlim=c(0,1), ylim=c(0,1),
-     ylab='True Positive Rate',
-     xlab='False Positive Rate',
-     bty='n')
