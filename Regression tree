@@ -1,0 +1,75 @@
+library(ISLR) #contains Hitters dataset
+library(rpart) #for fitting decision trees
+library(rpart.plot) #for plotting decision trees
+
+library(readxl)
+set.seed(06192024)
+GS_5_23_24 <- read_excel("D:/GS 5.23.24.xlsx")
+View(GS_5_23_24)
+
+#Splitting dataset into 4:1 ratio for training data set
+library(caTools)
+sample_data = sample.split (GS_5_23_24$GS0or1, SplitRatio=0.75)
+train_data <- subset(GS_5_23_24, sample_data==TRUE)
+test_data <- subset(GS_5_23_24, sample_data==FALSE)
+
+train_data$GS0or1 = factor(train_data$GS0or1)
+test_data$GS0or1 = factor(test_data$GS0or1)
+
+
+rtree.fit <- rpart(GS0or1 ~ Ecadherin+Ncadherin+Bcatenin+phosphoRbS249+Stage+Grade+GleasonGrade+Metastais+LymphNodes+TumorSize, 
+                   data=train_data,
+                   method="anova", #for regression tree
+                   control=rpart.control(minsplit=30,cp=0.01871386))
+
+#cp optimo
+printcp(rtree.fit)
+cp.select <- function(big.tree) {
+  min.x <- which.min(big.tree$cptable[, 4]) #column 4 is xerror
+  for(i in 1:nrow(big.tree$cptable)) {
+    if(big.tree$cptable[i, 4] < big.tree$cptable[min.x, 4] + big.tree$cptable[min.x, 5]) return(big.tree$cptable[i, 1]) #column 5: xstd, column 1: cp
+  }
+}
+pruned.tree <- prune(rtree.fit, cp = cp.select(rtree.fit))
+cp.select(rtree.fit)
+
+
+printcp(rtree.fit) # display the results 
+rsq.rpart(rtree.fit) #produces 2 plots
+plotcp(rtree.fit) # visualize cross-validation results 
+
+summary(rtree.fit) # detailed summary of splits
+
+# plot tree (old schol way)
+plot(rtree.fit, uniform=TRUE, 
+     main="Regression Tree for Median Home Value")
+text(rtree.fit, use.n=TRUE, all=TRUE, cex=.8)
+
+# create more atrractive plot of tree 
+#using prp() in the rpart.plot package
+prp(rtree.fit)
+
+#using Rattle package
+#fancyRpartPlot(rtree.fit)
+
+# prune the tree based on minimim xerror
+pruned.rtree.fit<- prune(rtree.fit, cp= rtree.fit$cptable[which.min(rtree.fit$cptable[,"xerror"]),"CP"])
+
+# plot the pruned tree using prp() in the rpart.plot package 
+prp(pruned.rtree.fit, main="Pruned Regression Tree for Median Home Value")
+
+# prune the tree based on 1 SE error 
+pruned2.rtree.fit<- prune(rtree.fit, cp=.01)
+
+# plot the pruned tree using prp() in the rpart.plot package
+prp(pruned2.rtree.fit, main="Pruned Regression Tree for Median Home Value")
+
+#original tree
+cor(predict(rtree.fit, newdata=test_data),test_data$GS0or1)^2
+
+#pruned tree #1
+cor(predict(pruned.rtree.fit, newdata=test_data),test_data$GS0or1)^2
+
+#pruned tree #2
+cor(predict(pruned2.rtree.fit, newdata=test_data),test_data$GS0or1)^2
+
