@@ -1,0 +1,111 @@
+#Models comparisons
+
+# Load necessary libraries
+library(readxl)
+library(caTools)
+library(rpart)
+library(rpart.plot)
+library(caret)
+library(pROC)
+library(nnet)
+
+# Set seed for reproducibility
+set.seed(06192024)
+
+# Read the Excel file
+GS_5_23_24 <- read_excel("D:/GS 5.23.24.xlsx")
+GS_5_23_24 <- na.omit(GS_5_23_24)
+
+# Split dataset into 4:1 ratio for training and test sets
+sample_data <- sample.split(GS_5_23_24$GS0or1, SplitRatio = 0.75)
+train_data <- subset(GS_5_23_24, sample_data == TRUE)
+test_data <- subset(GS_5_23_24, sample_data == FALSE)
+
+
+
+
+# Train logistic regression model
+logistic_model <- glm(GS0or1 ~ Ecadherin + Ncadherin + Bcatenin + phosphoRbS249 + Stage + Grade + GleasonGrade + Metastais + LymphNodes + TumorSize, 
+                      data = train_data, family = binomial)
+
+# Predict on test data
+logistic_pred_prob <- predict(logistic_model, newdata = test_data, type = "response")
+logistic_pred_class <- ifelse(logistic_pred_prob > 0.5, 1, 0)
+
+# Confusion matrix and accuracy
+logistic_conf_matrix <- confusionMatrix(as.factor(logistic_pred_class), as.factor(test_data$GS0or1))
+logistic_accuracy <- logistic_conf_matrix$overall['Accuracy']
+
+# Calculate AUC
+logistic_roc <- roc(test_data$GS0or1, logistic_pred_prob)
+logistic_auc <- auc(logistic_roc)
+
+cat("Logistic Regression Accuracy: ", logistic_accuracy, "\n")
+cat("Logistic Regression AUC: ", logistic_auc, "\n")
+
+
+
+# Train classification tree model
+ctree_model <- rpart(GS0or1 ~ Ecadherin + Ncadherin + Bcatenin + phosphoRbS249 + Stage + Grade + GleasonGrade + Metastais + LymphNodes + TumorSize, 
+                     data = train_data, method = "class", control = rpart.control(minsplit = 30, cp = 0.01))
+
+# Prune the tree
+optimal_cp <- ctree_model$cptable[which.min(ctree_model$cptable[,"xerror"]),"CP"]
+pruned_ctree <- prune(ctree_model, cp = optimal_cp)
+
+# Predict on test data
+ctree_pred_prob <- predict(pruned_ctree, newdata = test_data, type = "prob")[,2]
+ctree_pred_class <- predict(pruned_ctree, newdata = test_data, type = "class")
+
+# Confusion matrix and accuracy
+ctree_conf_matrix <- confusionMatrix(ctree_pred_class, test_data$GS0or1)
+ctree_accuracy <- ctree_conf_matrix$overall['Accuracy']
+
+# Calculate AUC
+ctree_roc <- roc(test_data$GS0or1, ctree_pred_prob)
+ctree_auc <- auc(ctree_roc)
+
+cat("Classification Tree Accuracy: ", ctree_accuracy, "\n")
+cat("Classification Tree AUC: ", ctree_auc, "\n")
+
+
+
+# Train regression tree model
+rtree_model <- rpart(GS0or1 ~ Ecadherin + Ncadherin + Bcatenin + phosphoRbS249 + Stage + Grade + GleasonGrade + Metastais + LymphNodes + TumorSize, 
+                     data = train_data, method = "anova", control = rpart.control(minsplit = 30, cp = 0.01))
+
+# Prune the tree
+optimal_cp_rtree <- rtree_model$cptable[which.min(rtree_model$cptable[,"xerror"]),"CP"]
+pruned_rtree <- prune(rtree_model, cp = optimal_cp_rtree)
+
+# Predict on test data
+rtree_pred <- predict(pruned_rtree, newdata = test_data)
+
+# Since regression outputs continuous values, threshold at 0.5 for classification
+rtree_pred_class <- ifelse(rtree_pred > 0.5, 1, 0)
+
+# Confusion matrix and accuracy
+rtree_conf_matrix <- confusionMatrix(as.factor(rtree_pred_class), as.factor(test_data$GS0or1))
+rtree_accuracy <- rtree_conf_matrix$overall['Accuracy']
+
+# Calculate AUC
+rtree_roc <- roc(test_data$GS0or1, rtree_pred)
+rtree_auc <- auc(rtree_roc)
+
+cat("Regression Tree Accuracy: ", rtree_accuracy, "\n")
+cat("Regression Tree AUC: ", rtree_auc, "\n")
+
+
+
+# Print summary of performance metrics
+cat("Model Performance Summary:\n")
+cat("Logistic Regression - Accuracy: ", logistic_accuracy, ", AUC: ", logistic_auc, "\n")
+cat("Classification Tree - Accuracy: ", ctree_accuracy, ", AUC: ", ctree_auc, "\n")
+cat("Regression Tree - Accuracy: ", rtree_accuracy, ", AUC: ", rtree_auc, "\n")
+
+# Plot ROC curves for comparison
+plot(logistic_roc, col = "blue", main = "ROC Curves Comparison")
+plot(ctree_roc, col = "red", add = TRUE)
+plot(rtree_roc, col = "green", add = TRUE)
+legend("bottomright", legend = c("Logistic Regression", "Classification Tree", "Regression Tree"), 
+       col = c("blue", "red", "green"), lty = 1)
