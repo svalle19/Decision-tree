@@ -88,3 +88,9 @@ if (sum(valid_indices) > 0) {
 } else {
   cat("No valid data points to calculate RMSE.\n")
 }
+# Predict on the test set
+pred_class <- predict(pruned_tree, newdata = test_data, type = "class")
+pred_prob <- predict(pruned_tree, newdata = test_data, type = "prob")[,2]
+# Confusion matrix to evaluate the classification performance
+conf_matrix <- confusionMatrix(pred_class, test_data$E1or2)
+print(conf_matrix)
